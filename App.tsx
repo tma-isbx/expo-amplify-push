@@ -4,6 +4,14 @@ import * as Permissions from 'expo-permissions';
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, View, Button, Platform } from 'react-native';
 
+import Amplify from '@aws-amplify/core';
+import config from './aws-exports';
+Amplify.configure(config);
+import API, { graphqlOperation } from '@aws-amplify/api';
+import { listUsers } from './src/graphql/queries';
+import { createUser, updateUser } from './src/graphql/mutations';
+
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -17,19 +25,53 @@ export default function App() {
   const [notification, setNotification] = useState(false);
   const notificationListener = useRef();
   const responseListener = useRef();
+  const username = 'Example';
 
   useEffect(() => {
-    registerForPushNotificationsAsync().then(token => setExpoPushToken(token));
+    const f = async () => {
+      const token = await registerForPushNotificationsAsync();
+      setExpoPushToken(token);
 
-    // This listener is fired whenever a notification is received while the app is foregrounded
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      setNotification(notification);
-    });
+      const results = await API.graphql(graphqlOperation(listUsers, { filter: { username: { eq: username } } } ));
+      const users = results.data.listUsers.items;
 
-    // This listener is fired whenever a user taps on or interacts with a notification (works when app is foregrounded, backgrounded, or killed)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log(response);
-    });
+      // TODO: Really, a user could have more than one pushToken if they have the app
+      //        installed on multiple devices
+      if (users.length > 0) {
+        // upate
+        const input = {
+          id: users[0].id,
+          username,
+          pushToken: token
+        };
+
+        const result = await API.graphql(graphqlOperation(updateUser, { input }));
+        console.log('updated', result);
+      } else {
+        // create
+        const input = {
+          username,
+          pushToken: token
+        };
+
+        const result = await API.graphql(graphqlOperation(createUser, { input }));
+        console.log('created', result);
+      }
+
+      // This listener is fired whenever a notification is received while the app is foregrounded
+      notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+        setNotification(notification);
+      });
+
+      // This listener is fired whenever a user taps on or interacts with a notification (works when app is foregrounded, backgrounded, or killed)
+      responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log(response);
+      });
+
+    };
+
+    f();
+
 
     return () => {
       Notifications.removeNotificationSubscription(notificationListener);

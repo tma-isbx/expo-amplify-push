@@ -8,6 +8,7 @@
     "eject": "expo eject"
   },
   "dependencies": {
+    "aws-amplify": "^3.0.23",
     "expo": "~38.0.8",
     "expo-notifications": "^0.5.0",
     "expo-status-bar": "^1.0.2",
