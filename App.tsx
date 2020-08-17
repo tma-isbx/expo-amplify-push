@@ -32,6 +32,9 @@ export default function App() {
       const token = await registerForPushNotificationsAsync();
       setExpoPushToken(token);
 
+      // TODO: ideally from a security perspective, we should not leak the tokens
+      // back to any random user. For that matter, any random user should not be
+      // able to list all user. 
       const results = await API.graphql(graphqlOperation(listUsers, { filter: { username: { eq: username } } } ));
       const users = results.data.listUsers.items;
 
@@ -79,6 +82,18 @@ export default function App() {
     };
   }, []);
 
+  const sendPush = async () => {
+    // find users we want to push to, in our case, "Example"
+    // TODO: we've added a level of indirection, but this should really occur on the serverside
+    // TODO: random users should not be able to list all users or see their tokens (or emails, etc)
+    const results = await API.graphql(graphqlOperation(listUsers, { filter: { username: { eq: username } } } ));
+    const users = results.data.listUsers.items;
+
+    for (const user of users) {
+      await sendPushNotification(user.pushToken);
+    }
+  };
+
   return (
     <View
       style={{
@@ -94,9 +109,7 @@ export default function App() {
       </View>
       <Button
         title="Press to Send Notification"
-        onPress={async () => {
-          await sendPushNotification(expoPushToken);
-        }}
+        onPress={sendPush}
       />
     </View>
   );
